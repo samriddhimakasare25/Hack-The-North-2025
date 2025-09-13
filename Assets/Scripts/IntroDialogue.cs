@@ -1,11 +1,12 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using TMPro;
 
-public class IntroAutoStart : MonoBehaviour
+public class IntroClickPerLineMusic : MonoBehaviour
 {
     [Header("Refs")]
-    public TypewriterTMP typewriter;         // Drag TMP object with TypewriterTMP
-    public AudioSource musicSource;          // Drag your background music AudioSource here
+    public TypewriterTMP typewriter;      
+    public AudioSource musicSource;       // background music (looping)
 
     [Header("Lines")]
     [TextArea] public string line1 = "You look so down… You know what will cheer you up? A GAME!";
@@ -16,61 +17,141 @@ public class IntroAutoStart : MonoBehaviour
     [TextArea] public string continuePrompt = "Click to continue…";
 
     [Header("Next Scene")]
-    [Tooltip("Scene to load after the player clicks. Must be in Build Settings.")]
     public string nextSceneName = "";
-    public float postClickDelay = 0.2f;    // small delay for feel
+    public float postClickDelay = 0.15f;
 
-    private int stage = 0;
+    private enum Phase { Line1, Prompt1, Line2, Prompt2, Line3, Prompt3, Done }
+    private Phase phase = Phase.Line1;
     private bool waitingForClick = false;
+
+    private string accumulatedText = "";   // store all text typed so far
 
     void Start()
     {
         if (!typewriter) { Debug.LogError("TypewriterTMP ref not set."); return; }
-        typewriter.OnFinished.AddListener(OnLineFinished);
+        typewriter.OnFinished.AddListener(OnTypeFinished);
 
-        stage = 0;
-        typewriter.Play(line1);
+        accumulatedText = "";
+        PlayCurrentPhase();
+        PlayMusic();
     }
 
     void OnDestroy()
     {
-        if (typewriter) typewriter.OnFinished.RemoveListener(OnLineFinished);
+        if (typewriter) typewriter.OnFinished.RemoveListener(OnTypeFinished);
     }
 
     void Update()
     {
-        // Skip typing while animating
-        if ((Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0)) && typewriter && typewriter.IsTyping)
+        bool click = Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space);
+        if (!click) return;
+
+        // If typing, skip to full text
+        if (typewriter && typewriter.IsTyping)
         {
             typewriter.Skip();
             return;
         }
 
-        // After the prompt shows, wait for click/space to proceed
-        if (waitingForClick && !typewriter.IsTyping && (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0)))
+        // If waiting for click after prompt
+        if (waitingForClick)
         {
             waitingForClick = false;
-            Invoke(nameof(StartGame), postClickDelay);
+            AdvancePhase();
         }
     }
 
-    private void OnLineFinished()
+    private void OnTypeFinished()
     {
-        stage++;
-        switch (stage)
+        switch (phase)
         {
-            case 1:
-                typewriter.Play(line2);
+            case Phase.Line1:
+                phase = Phase.Prompt1;
+                PlayCurrentPhase();
                 break;
-            case 2:
-                typewriter.Play(line3);
-                break;
-            case 3:
-                // stop the music right after the last dialogue line finishes
-                if (musicSource) musicSource.Stop();
 
-                typewriter.Play(continuePrompt);
+            case Phase.Prompt1:
                 waitingForClick = true;
+                StopMusic();
+                break;
+
+            case Phase.Line2:
+                phase = Phase.Prompt2;
+                PlayCurrentPhase();
+                break;
+
+            case Phase.Prompt2:
+                waitingForClick = true;
+                StopMusic();
+                break;
+
+            case Phase.Line3:
+                phase = Phase.Prompt3;
+                PlayCurrentPhase();
+                break;
+
+            case Phase.Prompt3:
+                waitingForClick = true;
+                StopMusic();
+                break;
+        }
+    }
+
+    private void AdvancePhase()
+    {
+        switch (phase)
+        {
+            case Phase.Prompt1:
+                phase = Phase.Line2;
+                PlayCurrentPhase();
+                PlayMusic();
+                break;
+
+            case Phase.Prompt2:
+                phase = Phase.Line3;
+                PlayCurrentPhase();
+                PlayMusic();
+                break;
+
+            case Phase.Prompt3:
+                phase = Phase.Done;
+                Invoke(nameof(StartGame), postClickDelay);
+                break;
+        }
+    }
+
+    private void PlayCurrentPhase()
+    {
+        switch (phase)
+        {
+            case Phase.Line1:
+                accumulatedText += line1;
+                typewriter.Play(accumulatedText);
+                break;
+
+            case Phase.Prompt1:
+                accumulatedText += "\n" + continuePrompt;
+                typewriter.Play(accumulatedText);
+                break;
+
+            case Phase.Line2:
+                accumulatedText += "\n\n" + line2;
+                typewriter.Play(accumulatedText);
+                break;
+
+            case Phase.Prompt2:
+                accumulatedText += "\n" + continuePrompt;
+                typewriter.Play(accumulatedText);
+                break;
+
+            case Phase.Line3:
+                accumulatedText += "\n\n" + line3;
+                typewriter.Play(accumulatedText);
+                break;
+
+            case Phase.Prompt3:
+                accumulatedText += "\n" + continuePrompt;
+                typewriter.Play(accumulatedText);
                 break;
         }
     }
@@ -84,7 +165,19 @@ public class IntroAutoStart : MonoBehaviour
         }
         else
         {
-            Debug.Log("Game start! (No nextSceneName set)");
+            Debug.Log("Intro finished. (No nextSceneName set.)");
         }
+    }
+
+    private void PlayMusic()
+    {
+        if (musicSource && !musicSource.isPlaying)
+            musicSource.Play();
+    }
+
+    private void StopMusic()
+    {
+        if (musicSource && musicSource.isPlaying)
+            musicSource.Stop();
     }
 }
