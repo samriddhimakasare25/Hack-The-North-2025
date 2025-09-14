@@ -323,7 +323,7 @@ MonoBehaviour:
   line2: What are you willing to do for some sweet, sweet cash?!
   line3: Do you want to play?
   continuePrompt: "Click to continue\u2026"
-  nextSceneName: Game 1
+  nextSceneName: Splash Page
   postClickDelay: 0.3
 --- !u!114 &408396088
 MonoBehaviour:
